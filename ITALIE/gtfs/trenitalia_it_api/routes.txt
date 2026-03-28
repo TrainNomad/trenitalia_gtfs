@@ -1,0 +1,7 @@
+route_id,agency_id,route_short_name,route_long_name,route_type
+TI_ROUTE_IC,TI,IC,Intercity,101
+TI_ROUTE_FR,TI,FR,Frecciarossa,100
+TI_ROUTE_EN,TI,EN,EuroNight,101
+TI_ROUTE_EC,TI,EC,EuroCity,101
+TI_ROUTE_FA,TI,FA,Frecciargento,100
+TI_ROUTE_FB,TI,FB,Frecciabianca,101

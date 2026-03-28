@@ -1,0 +1,82 @@
+name: Build Trenitalia GTFS
+
+on:
+  schedule:
+    # Tous les jours à 03:00 UTC (04:00 Rome en hiver, 05:00 en été)
+    - cron: '0 3 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:          # déclenchement manuel depuis l'UI GitHub
+
+permissions:
+  contents: write             # nécessaire pour créer/mettre à jour la Release
+
+jobs:
+  build-gtfs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── 1. Checkout du repo ──────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ───────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── 3. Générer les données GTFS ──────────────────────────────────────
+      - name: Build GTFS
+        run: |
+          node build-trenitalia-gtfs.js \
+            --days 30 \
+            --out ./gtfs/trenitalia_it_api
+        # Le script retourne exit 1 en cas d'erreur fatale → le job échoue
+
+      # ── 4. Zipper les fichiers GTFS ──────────────────────────────────────
+      - name: Zip GTFS
+        run: |
+          cd gtfs
+          zip -r ../trenitalia_gtfs.zip trenitalia_it_api/
+          cd ..
+          echo "ZIP_SIZE=$(du -sh trenitalia_gtfs.zip | cut -f1)" >> $GITHUB_ENV
+
+      # ── 5. Publier / mettre à jour la Release "latest" ───────────────────
+      #    Utilise le tag "latest-gtfs" (tag flottant mis à jour à chaque run)
+      #    → ton backend peut toujours télécharger la même URL stable.
+      - name: Delete existing "latest-gtfs" tag (if exists)
+        run: |
+          git tag -d latest-gtfs 2>/dev/null || true
+          git push origin :refs/tags/latest-gtfs 2>/dev/null || true
+
+      - name: Create Release & upload ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-gtfs
+          name: "GTFS Trenitalia — ${{ env.TODAY }}"
+          body: |
+            Feed généré automatiquement depuis l'API lefrecce.it.
+            - Fenêtre : 30 jours à partir d'aujourd'hui
+            - Mise à jour : ${{ env.TODAY }}
+            - Taille ZIP : ${{ env.ZIP_SIZE }}
+
+            **Téléchargement direct :**
+            ```
+            https://github.com/${{ github.repository }}/releases/download/latest-gtfs/trenitalia_gtfs.zip
+            ```
+          files: trenitalia_gtfs.zip
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TODAY: ${{ github.run_started_at }}
+
+      # ── 6. (Optionnel) Garder aussi le ZIP comme Artifact Actions ────────
+      #    Utile pour déboguer sans avoir besoin d'une Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trenitalia-gtfs-${{ github.run_number }}
+          path: trenitalia_gtfs.zip
+          retention-days: 7
