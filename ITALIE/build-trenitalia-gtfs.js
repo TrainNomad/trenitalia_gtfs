@@ -670,4 +670,17 @@ function buildGTFS() {
   buildGTFS();
   console.log(`  📁 GTFS écrit dans ${OUT_DIR}/\n`);
 
+  // ─── ZIP du GTFS ────────────────────────────────────────────────────────
+  const ZIP_PATH = path.join(OUT_DIR, 'gtfs.zip');
+  console.log(`  📦 Création du ZIP : ${ZIP_PATH}`);
+  try {
+    const { execSync } = require('child_process');
+    // On zippe uniquement les .txt depuis OUT_DIR (pas le zip lui-même)
+    execSync(`cd "${OUT_DIR}" && zip -q gtfs.zip *.txt`);
+    console.log(`  ✅ ZIP créé : ${ZIP_PATH}\n`);
+  } catch (zipErr) {
+    console.error(`  ❌ Erreur création ZIP : ${zipErr.message}`);
+    process.exit(1);
+  }
+
 })().catch(err => { console.error('\n❌', err.message); process.exit(1); });
