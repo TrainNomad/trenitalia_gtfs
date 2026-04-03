@@ -670,14 +670,25 @@ function buildGTFS() {
   buildGTFS();
   console.log(`  📁 GTFS écrit dans ${OUT_DIR}/\n`);
 
-  // ─── ZIP du GTFS ────────────────────────────────────────────────────────
+  // ─── ZIP du GTFS (Node.js natif, cross-platform) ────────────────────────
   const ZIP_PATH = path.join(OUT_DIR, 'gtfs.zip');
   console.log(`  📦 Création du ZIP : ${ZIP_PATH}`);
   try {
-    const { execSync } = require('child_process');
-    // On zippe uniquement les .txt depuis OUT_DIR (pas le zip lui-même)
-    execSync(`cd "${OUT_DIR}" && zip -q gtfs.zip *.txt`);
-    console.log(`  ✅ ZIP créé : ${ZIP_PATH}\n`);
+    const JSZip = require('jszip');
+    const zip   = new JSZip();
+
+    const txtFiles = fs.readdirSync(OUT_DIR).filter(f => f.endsWith('.txt'));
+    for (const file of txtFiles) {
+      zip.file(file, fs.readFileSync(path.join(OUT_DIR, file)));
+    }
+
+    const zipBuffer = await zip.generateAsync({
+      type:               'nodebuffer',
+      compression:        'DEFLATE',
+      compressionOptions: { level: 6 },
+    });
+    fs.writeFileSync(ZIP_PATH, zipBuffer);
+    console.log(`  ✅ ZIP créé : ${ZIP_PATH} (${txtFiles.length} fichiers, ${(zipBuffer.length/1024).toFixed(0)} KB)\n`);
   } catch (zipErr) {
     console.error(`  ❌ Erreur création ZIP : ${zipErr.message}`);
     process.exit(1);
